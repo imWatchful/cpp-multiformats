@@ -3,44 +3,28 @@
 #include <limits>
 #include <span>
 
-namespace varint
-{
-enum class encode_error
-{
-    none,
-    buffer_too_small,
-    overflow
-};
+namespace varint {
+enum class encode_error { none, buffer_too_small, overflow };
 
-enum class decode_error
-{
-    none,
-    buffer_too_small,
-    overflow,
-    not_minimal
-};
+enum class decode_error { none, buffer_too_small, overflow, not_minimal };
 
-template <std::unsigned_integral T> constexpr std::size_t max_encoded_size() noexcept
-{
+template <std::unsigned_integral T> constexpr std::size_t max_encoded_size() noexcept {
     return (std::numeric_limits<T>::digits + 6) / 7;
 }
 
 template <std::unsigned_integral T>
-constexpr encode_error encode(T value, std::span<std::uint8_t> out, std::size_t &bytes_out) noexcept
-{
+constexpr encode_error encode(T value, std::span<std::uint8_t> out, std::size_t &bytes_out) noexcept {
     constexpr std::size_t spec_max_bytes = 9;
     constexpr std::size_t max_bytes = (max_encoded_size<T>() < spec_max_bytes) ? max_encoded_size<T>() : spec_max_bytes;
 
-    if constexpr (std::numeric_limits<T>::digits > 63)
-    {
+    if constexpr (std::numeric_limits<T>::digits > 63) {
         if (value >= (T(1) << 63))
             return encode_error::overflow;
     }
 
     std::size_t needed = 1;
     T tmp = value;
-    while (tmp >= T(0x80))
-    {
+    while (tmp >= T(0x80)) {
         tmp >>= 7;
         ++needed;
     }
@@ -52,8 +36,7 @@ constexpr encode_error encode(T value, std::span<std::uint8_t> out, std::size_t 
         return encode_error::buffer_too_small;
 
     std::size_t i = 0;
-    do
-    {
+    do {
         std::uint8_t byte = static_cast<std::uint8_t>(value & 0x7F);
         value >>= 7;
 
@@ -68,8 +51,7 @@ constexpr encode_error encode(T value, std::span<std::uint8_t> out, std::size_t 
 }
 
 template <std::unsigned_integral T>
-constexpr decode_error decode(std::span<const std::uint8_t> in, T &value_out, std::size_t &bytes_out) noexcept
-{
+constexpr decode_error decode(std::span<const std::uint8_t> in, T &value_out, std::size_t &bytes_out) noexcept {
     constexpr std::size_t spec_max_bytes = 9;
     constexpr std::size_t max_bytes = (max_encoded_size<T>() < spec_max_bytes) ? max_encoded_size<T>() : spec_max_bytes;
     constexpr std::size_t limit_bits = (std::numeric_limits<T>::digits < 63) ? std::numeric_limits<T>::digits : 63;
@@ -77,8 +59,7 @@ constexpr decode_error decode(std::span<const std::uint8_t> in, T &value_out, st
     T value = 0;
     std::size_t shift = 0;
 
-    for (std::size_t i = 0; i < in.size() && i < max_bytes; ++i)
-    {
+    for (std::size_t i = 0; i < in.size() && i < max_bytes; ++i) {
         std::uint8_t byte = in[i];
         T chunk = static_cast<T>(byte & 0x7F);
 
@@ -92,8 +73,7 @@ constexpr decode_error decode(std::span<const std::uint8_t> in, T &value_out, st
         value |= (chunk << shift);
         shift += 7;
 
-        if ((byte & 0x80) == 0)
-        {
+        if ((byte & 0x80) == 0) {
             if (i > 0 && byte == 0x00)
                 return decode_error::not_minimal;
 
